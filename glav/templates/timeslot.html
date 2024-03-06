@@ -1,0 +1,40 @@
+{% extends 'root.html' %}
+{% load static %}
+
+{% block title %}<title>Расписание</title>{% endblock %}
+
+{% block content %}
+<center><h4>Расписание</h4></center>
+<br>
+<div class='container-circle'>
+<table class="table">
+  <thead>
+    <tr>
+      <th scope="col">#</th>
+      <th scope="col">Врач</th>
+      <th scope="col">График работы</th>
+      <th scope="col">Бронь</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th scope="row">1</th>
+      <td>Стивен стрендж</td>
+      <td>Понедельник с 8 утра до 5 вечера</td>
+      <td>2021-03-01 8.00-8.20 - забронировано</td>
+    </tr>
+    <tr>
+      <th scope="row">2</th>
+      <td></td>
+      <td>Вторник с 8 утра до 5 вечера</td>
+      <td>2021-08-01 8.00-8.20 - нет брони</td>
+    </tr>
+    <tr>
+      <th scope="row">3</th>
+      <td colspan="2"></td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+{% endblock %}
