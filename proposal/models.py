@@ -34,7 +34,7 @@ class Proposal(models.Model):
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
 
-        # После успешного сохранения предложения, удаляем забронированный временной интервал из расписания
+        # После успешного сохранения удаляем забронированный временной интервал из расписания
         WorkDaysSchedule.objects.filter(
             doctor=self.type,
             schedule__datetime_start=self.visit_time
@@ -47,6 +47,7 @@ class Proposal(models.Model):
         ordering = ['-created_at']
         verbose_name = 'Заявка'
         verbose_name_plural = 'Заявки'
+
 
 class WorkSchedule(models.Model):   # Рабочий график
     datetime_start = models.DateTimeField(verbose_name='Начало времени')
@@ -71,7 +72,7 @@ class Days(models.Model):   # Дни
         verbose_name_plural = 'Дни'
 
 
-class WorkDaysSchedule(models.Model):
+class WorkDaysSchedule(models.Model): # вот это большой вопрос возможно из-за этого все беды
     day = models.ForeignKey(Days, on_delete=models.CASCADE, verbose_name='День')
     doctor = models.ForeignKey(Post, on_delete=models.CASCADE, verbose_name='Доктор')
     schedule = models.ForeignKey(WorkSchedule, on_delete=models.CASCADE, verbose_name='График')

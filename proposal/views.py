@@ -1,70 +1,68 @@
+from datetime import timedelta
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
-from django.contrib import messages
-from django.db import transaction
-from .models import Proposal, WorkDaysSchedule, Post
+from .models import Proposal, WorkDaysSchedule, Post, Days
 from .forms import ProposalForm
-from datetime import datetime, timedelta
 
 def count_intervals(start_time, end_time):
+    # Функция возвращает количество временных слотов
     return int((end_time - start_time).seconds / 60 / 20)
 
 def generate_time(start_time, iteration):
+    # Генерация времени с учетом интервала в 20 минут
     return start_time + timedelta(minutes=20 * iteration)
 
-def get_available_time_slots(work_days_schedule, doctor, user):
-    busy_times = []
+def get_available_time_slots(doctor, user, selected_day=None):
+    # Получение доступных временных слотов для записи к врачу
+    busy_times = Proposal.objects.filter(type=doctor, user=user).values_list('visit_time', flat=True)
+    all_times = []
+
+    work_days_schedule = WorkDaysSchedule.objects.filter(doctor=doctor)
 
     for schedule in work_days_schedule:
         start_time = schedule.schedule.datetime_start
         end_time = schedule.schedule.datetime_end
-        intervals = count_intervals(start_time, end_time)
-        all_times = [generate_time(start_time, i) for i in range(intervals)]
 
-        busy_times.extend(Proposal.objects.filter(type=doctor, visit_time__in=all_times, user=user).values_list('visit_time', flat=True))
+        if selected_day and schedule.day.date != selected_day:  # Фильтрация
+            # Пропускаем временные интервалы, не относящиеся к выбранному дню
+            continue
+
+        # Генерируем слоты и исключаем те которые уже заняты
+        intervals = count_intervals(start_time, end_time)
+        all_times.extend([generate_time(start_time, i) for i in range(intervals)])
 
     available_time_slots = [time for time in all_times if time not in busy_times]
     return available_time_slots
 
 def proposal(request, doctor_id):
     doctor = get_object_or_404(Post, pk=doctor_id)
-    work_days_schedule = WorkDaysSchedule.objects.filter(doctor=doctor)
-
-    # Получаем доступные временные слоты для текущего дня
-    available_time_slots = get_available_time_slots(work_days_schedule, doctor, request.user)
-
     proposals = Proposal.objects.filter(user=request.user, type=doctor)
 
     if request.method == 'POST':
-        form = ProposalForm(doctor, work_days_schedule, request.POST)
+        form = ProposalForm(data=request.POST)
         if form.is_valid():
-            with transaction.atomic():
-                selected_time = form.cleaned_data['selected_time']
+            selected_time = form.cleaned_data['selected_time']
+            selected_day = form.cleaned_data['selected_day']
 
-                if Proposal.objects.filter(type=doctor, visit_time=selected_time, user=request.user).exists():
-                    messages.error(request, 'Этот временной слот уже занят.')
-                else:
-                    proposal = form.save(commit=False)
-                    proposal.user = request.user
-                    proposal.type = doctor
-                    proposal.visit_time = selected_time
-                    proposal.save()
+            proposal = form.save(commit=False)
+            proposal.user = request.user
+            proposal.type = doctor
+            proposal.visit_time = selected_time
+            proposal.save()
 
-                    # Обновление списка доступных временных слотов
-                    work_days_schedule = WorkDaysSchedule.objects.filter(doctor=doctor)
-                    available_time_slots = get_available_time_slots(work_days_schedule, doctor, request.user)
-
-                    messages.success(request, 'Заявка успешно отправлена и время забронировано.')
-
-                    # Передаем обновленные временные слоты в форму
-                    form.update_time_slot_queryset(work_days_schedule)
-
-                    return redirect(reverse('proposal', args=(doctor_id,)))
+            return redirect(reverse('proposal', args=(doctor_id,)) + f'?selected_day={selected_day}')
     else:
-        form = ProposalForm(doctor, work_days_schedule)
+        # Отображение формы для выбора дня и времени записи
+        selected_day = request.GET.get('selected_day')
+        work_days_schedule = WorkDaysSchedule.objects.filter(doctor=doctor)
 
-    # Обновление списка занятых временных слотов
+        form = ProposalForm(work_days_schedule=work_days_schedule, selected_day=selected_day)
+
+    # доступные временные слоты для бронирования
+    available_time_slots = get_available_time_slots(doctor, request.user, selected_day)
+    #  извлекаем временные слоты, которые уже заняты пользователем
     busy_times = Proposal.objects.filter(type=doctor, visit_time__in=available_time_slots, user=request.user).values_list('visit_time', flat=True)
+    days = Days.objects.all()
 
-    context = {'form': form, 'user': request.user, 'time_slots': available_time_slots, 'proposals': proposals, 'busy_times': busy_times}
+    context = {'form': form, 'user': request.user, 'time_slots': available_time_slots, 'proposals': proposals, 'busy_times': busy_times, 'days': days, 'selected_day': selected_day}
     return render(request, 'proposal.html', context)
