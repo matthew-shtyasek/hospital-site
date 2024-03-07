@@ -31,14 +31,6 @@ class Proposal(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Дата изменения')
     visit_time = models.DateTimeField(verbose_name='Время посещения')
 
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-
-        # После успешного сохранения удаляем забронированный временной интервал из расписания
-        WorkDaysSchedule.objects.filter(
-            doctor=self.type,
-            schedule__datetime_start=self.visit_time
-        ).delete()
 
     def __str__(self):
         return self.user.name
@@ -50,11 +42,11 @@ class Proposal(models.Model):
 
 
 class WorkSchedule(models.Model):   # Рабочий график
-    datetime_start = models.DateTimeField(verbose_name='Начало времени')
-    datetime_end = models.DateTimeField(verbose_name='Конец времени')
+    datetime_start = models.TimeField(verbose_name='Начало времени')
+    datetime_end = models.TimeField(verbose_name='Конец времени')
 
     def __str__(self):
-        return str(self.datetime_start)
+        return f'{self.datetime_start} - {self.datetime_end}'
 
     class Meta:
         verbose_name = 'Рабочий график'
@@ -73,7 +65,10 @@ class Days(models.Model):   # Дни
 
 
 class WorkDaysSchedule(models.Model): # вот это большой вопрос возможно из-за этого все беды
-    day = models.ForeignKey(Days, on_delete=models.CASCADE, verbose_name='День')
+    day = models.ForeignKey(Days,
+                            on_delete=models.CASCADE,
+                            related_name='wds',
+                            verbose_name='День')
     doctor = models.ForeignKey(Post, on_delete=models.CASCADE, verbose_name='Доктор')
     schedule = models.ForeignKey(WorkSchedule, on_delete=models.CASCADE, verbose_name='График')
 
